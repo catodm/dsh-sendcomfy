@@ -1,0 +1,42 @@
+{
+  "name": "dsh-sendcomfy",
+  "version": "0.5.0",
+  "private": false,
+  "description": "ComfyUI bridge for DeepSeek Harness: configure a ComfyUI server from the sidebar, browse its models, manage workflows, and let the session model run workflows with prompts and node parameter overrides.",
+  "type": "module",
+  "main": "index.js",
+  "icon": "icon.svg",
+  "exports": {
+    ".": "./index.js",
+    "./client": "./client.js",
+    "./locale/*.json": "./locale/*.json",
+    "./icon": "./icon.svg",
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "index.js",
+    "client.js",
+    "lib",
+    "locale/*.json",
+    "icon.svg",
+    "cordis.patch.yml",
+    "README.md",
+    "CONTRACT.md",
+    "FEATURES.zh.md"
+  ],
+  "engines": {
+    "node": ">=22"
+  },
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    },
+    "client": {
+      "platform": "web",
+      "immediately": true,
+      "inject": [
+        "@deepseek-ai/dsh-client-locale"
+      ]
+    }
+  }
+}
