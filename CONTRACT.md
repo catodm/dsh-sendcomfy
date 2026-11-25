@@ -2,18 +2,18 @@
 
 > 目标：DSH（DeepSeek Harness）持久插件。侧边栏一个 ComfyUI 面板（配置 Comfy IP、看模型、导入/管理/运行工作流、填提示词、调参数），
 > 同时 Host 注册 `comfy_*` 工具，让会话里的文本模型直接调用 ComfyUI。
-> 包目录：`<本仓库目录>`
+> 包目录：`/run/user/1000/doc/84a6cc0b/dsh-agent/dsh-sendcomfy`
 > 包名：`dsh-sendcomfy`；**本文件是各文件之间的唯一契约，改接口先改这里并通知 Lead。**
 
 ## 0. 运行环境与硬约束
 
-- Node：`node`（v24.22.3）。shell 里直接 `node` 会因 snap 封装 + 无 DBus 失败，**一律用绝对路径**。
+- Node：`/snap/node/current/bin/node`（v24.22.3）。shell 里直接 `node` 会因 snap 封装 + 无 DBus 失败，**一律用绝对路径**。
 - 全部 ESM（`type: module`），**零第三方依赖**（只用 Node 内建 + 全局 fetch/FormData/Blob），不 import `@deepseek-ai/*`。
 - 不用 TypeScript、不用打包；`client.js` 是浏览器自注册脚本（见 §6）。
 - 工作流/配置持久化在 `$DSH_HOME/sendcomfy/state.json`（默认 `~/.dsh/sendcomfy/state.json`），**不改 profile 的 patch/package**。
 - 本包不导出 Schemastery `Config`（避免 schema 校验失败导致整条插件不激活）。
 - 文案：Host 侧错误信息可用中文；客户端 UI 文案走 locale（§7）。
-- 测试命令：`node --test test/xxx.test.mjs`
+- 测试命令：`/snap/node/current/bin/node --test test/xxx.test.mjs`
 
 ## 1. 文件归属（写作用域，互不重叠）
 
@@ -369,16 +369,16 @@ window.__ModuleLoader__.load({
 工具描述按 agent-experience 规范：先说用途与前提，参数规则写在参数里，不写实现细节。图片输出落盘到「当前会话工作目录/comfy-output/<promptId 前 8 位>/」。
 
 ## 9. 安装与验证（只有 Lead 做）
-- 安装：`plugin_manager { action:'install_bundle', target:'<本仓库目录>' }`
+- 安装：`plugin_manager { action:'install_bundle', target:'/run/user/1000/doc/84a6cc0b/dsh-agent/dsh-sendcomfy' }`
 - 验证：`cordis_inspect_query` Client `Slots.listSubTree`（root=`sidebar.panellist`/`main`）确认注册；Host `Tool.listTools` 确认工具；页面视觉由用户确认（本会话无浏览器控制）。
 - 安装前 Lead 会：`node --check` 全部 js、`node --test test/`、locale JSON 校验、manifest 校验。
 
 ## 10. 环境坑（2026-11-16 实测，所有人必读）
 
-1. shell 里直接 `node` 坏（snap 封装 + 无 DBus）。必须用绝对路径：`node`。
+1. shell 里直接 `node` 坏（snap 封装 + 无 DBus）。必须用绝对路径：`/snap/node/current/bin/node`。
 2. **node 进程不能在 workspace 目录作为 cwd 启动**（`process.cwd` 报 ENOENT，bootstrap 就崩）。所有 node 命令都必须 `workdir: "/tmp"`（bash 工具参数），再用**绝对路径**引用包内文件，例如：
-   `bash { workdir: "/tmp", command: "node --check <本仓库目录>/lib/comfy.mjs" }`
-   `bash { workdir: "/tmp", command: "node --test <本仓库目录>/test/comfy.test.mjs" }`
+   `bash { workdir: "/tmp", command: "/snap/node/current/bin/node --check /run/user/1000/doc/84a6cc0b/dsh-agent/dsh-sendcomfy/lib/comfy.mjs" }`
+   `bash { workdir: "/tmp", command: "/snap/node/current/bin/node --test /run/user/1000/doc/84a6cc0b/dsh-agent/dsh-sendcomfy/test/comfy.test.mjs" }`
 3. 从 /tmp cwd 的 node 进程看，**workspace 是只读的（EROFS）**：测试里要写临时文件/状态目录，用 `node:os.tmpdir()` + `mkdtemp`，**不要写包目录 / workspace**。要落盘新文件就用 write/edit 工具或 bash（bash 默认 workdir=workspace 时可写）。
 4. bash 沙箱偶发 bwrap 报错（"sandbox backend unusable"）或偶发 EROFS，重试即可。
 5. 测试读 fixture 用 `new URL('./fixtures/x.json', import.meta.url)` 或 `fileURLToPath(import.meta.url)` 推导，不要用 process.cwd()。

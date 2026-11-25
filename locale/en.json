@@ -1,6 +1,6 @@
 {
   "meta": {
     "title": "ComfyUI bridge",
-    "description": "Configure a ComfyUI server from the sidebar, browse its models, import and manage workflows, and let the session model run them with prompts and node parameter overrides."
+    "description": "Configure a ComfyUI server from the sidebar, browse its server-side workflows and models, and let the session model pick, parametrize, and run workflows on demand — no import step."
   }
 }

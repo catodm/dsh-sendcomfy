@@ -2,7 +2,7 @@
  * dsh-sendcomfy — lib/workflow.mjs 测试
  *
  * 运行（必须用绝对路径的 node，且 cwd 不要设成包目录）：
- *   cd /tmp && node --test <本仓库目录>/test/workflow.test.mjs
+ *   cd /tmp && /snap/node/current/bin/node --test /run/user/1000/doc/84a6cc0b/dsh-agent/dsh-sendcomfy/test/workflow.test.mjs
  *
  * fixtures 一律用 import.meta.url 定位（不依赖 process.cwd()）；测试只读，不写包目录。
  */

@@ -1,8 +1,8 @@
 {
   "name": "dsh-sendcomfy",
-  "version": "0.5.0",
+  "version": "0.5.1",
   "private": false,
-  "description": "ComfyUI bridge for DeepSeek Harness: configure a ComfyUI server from the sidebar, browse its models, manage workflows, and let the session model run workflows with prompts and node parameter overrides.",
+  "description": "ComfyUI bridge plugin for DeepSeek Harness (DSH): browse ComfyUI server workflows and models from the sidebar, and let the session model pick, parametrize, and run workflows on demand — no import step.",
   "type": "module",
   "main": "index.js",
   "icon": "icon.svg",
@@ -17,12 +17,14 @@
     "index.js",
     "client.js",
     "lib",
+    "bin",
     "locale/*.json",
     "icon.svg",
     "cordis.patch.yml",
     "README.md",
     "CONTRACT.md",
-    "FEATURES.zh.md"
+    "FEATURES.zh.md",
+    "LICENSE"
   ],
   "engines": {
     "node": ">=22"
@@ -38,5 +40,32 @@
         "@deepseek-ai/dsh-client-locale"
       ]
     }
+  },
+  "license": "MIT",
+  "keywords": [
+    "dsh-plugin",
+    "deepseek-harness",
+    "dsh",
+    "comfyui",
+    "stable-diffusion",
+    "workflow",
+    "plugin",
+    "agent",
+    "txt2img",
+    "img2img"
+  ],
+  "homepage": "https://github.com/catodm/dsh-sendcomfy#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/catodm/dsh-sendcomfy.git"
+  },
+  "bugs": {
+    "url": "https://github.com/catodm/dsh-sendcomfy/issues"
+  },
+  "bin": {
+    "sendcomfy": "bin/sendcomfy.mjs"
+  },
+  "scripts": {
+    "prepublishOnly": "node --check client.js && node --check index.js"
   }
 }

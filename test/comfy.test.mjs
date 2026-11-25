@@ -3,7 +3,7 @@
  *
  * 运行（环境坑见 CONTRACT.md §10：node 不能用包目录当 cwd，必须在 /tmp 下用绝对路径）：
  *   bash { workdir: "/tmp", command:
- *     "node --test <本仓库目录>/test/comfy.test.mjs" }
+ *     "/snap/node/current/bin/node --test /run/user/1000/doc/84a6cc0b/dsh-agent/dsh-sendcomfy/test/comfy.test.mjs" }
  *
  * 临时文件一律写 os.tmpdir()/mkdtemp（从 /tmp 看 workspace 是只读的 EROFS）。
  */
