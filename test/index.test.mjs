@@ -9,7 +9,7 @@
  */
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { createServer } from 'node:http'
+import { createServer, request } from 'node:http'
 import { mkdtemp, rm, mkdir, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
@@ -87,7 +87,7 @@ async function startRouteServer(routes) {
   return { url: `http://127.0.0.1:${port}`, close: () => new Promise((resolve) => server.close(resolve)) }
 }
 
-async function setup() {
+async function setup(options = {}) {
   const root = await mkdtemp(join(tmpdir(), 'sendcomfy-index-'))
   const workspace = join(root, 'workspace')
   await mkdir(workspace, { recursive: true })
@@ -95,6 +95,7 @@ async function setup() {
   const previousHome = process.env.DSH_HOME
   process.env.DSH_HOME = root
   const { ctx, tools, routes, disposers } = makeCtx(workspace)
+  if (options.connection !== undefined) ctx.connection = options.connection
   apply(ctx)
   const server = await startRouteServer(routes)
   return {
@@ -316,5 +317,64 @@ test('effect disposer 卸载后工具与路由都清掉', async () => {
     if (previousHome === undefined) delete process.env.DSH_HOME
     else process.env.DSH_HOME = previousHome
     await rm(root, { recursive: true, force: true })
+  }
+})
+
+/* ── 准入检查接线（index.js ← connection 服务）───────────────────────────── */
+
+test('准入检查：connection.requestRejection 拒绝时面板路由返回 401，业务层不执行', async () => {
+  const seen = []
+  const env = await setup({
+    connection: {
+      requestRejection({ headers }) {
+        seen.push(headers.host)
+        return 401
+      },
+    },
+  })
+  try {
+    const response = await fetch(`${env.server.url}/api/sendcomfy/state`)
+    assert.equal(response.status, 401)
+    const json = await response.json()
+    assert.equal(json.ok, false)
+    assert.equal(seen.length, 1, 'requestRejection 应当被调用一次')
+  } finally {
+    await env.close()
+  }
+})
+
+test('准入检查：connection 放行时面板路由照常返回', async () => {
+  const env = await setup({ connection: { requestRejection: () => undefined } })
+  try {
+    const response = await fetch(`${env.server.url}/api/sendcomfy/state`)
+    assert.equal(response.status, 200)
+    const json = await response.json()
+    assert.equal(json.ok, true)
+  } finally {
+    await env.close()
+  }
+})
+
+test('准入检查：没有 connection 时退回回环栅栏，非回环 Host 被拒', async () => {
+  const env = await setup()
+  try {
+    const status = await new Promise((resolve, reject) => {
+      const req = request(
+        `${env.server.url}/api/sendcomfy/state`,
+        { headers: { host: 'evil.example.com' } },
+        (res) => {
+          res.resume()
+          resolve(res.statusCode)
+        },
+      )
+      req.on('error', reject)
+      req.end()
+    })
+    assert.equal(status, 403)
+    // 同一条路由在回环 Host 下仍然正常
+    const ok = await fetch(`${env.server.url}/api/sendcomfy/state`)
+    assert.equal(ok.status, 200)
+  } finally {
+    await env.close()
   }
 })

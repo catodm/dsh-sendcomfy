@@ -128,7 +128,7 @@ AI 会自己 `comfy_choose_workflow` → `comfy_workflow` → `comfy_run`，并�
 ## 开发
 
 ```bash
-npm test                     # node:test，166 个用例
+npm test                     # node:test，169 个用例
 ```
 
 纯 ESM、零运行时依赖，只用 Node 内建 + 全局 `fetch`/`FormData`/`Blob`。
