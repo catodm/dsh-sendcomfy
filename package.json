@@ -1,6 +1,6 @@
 {
   "name": "dsh-sendcomfy",
-  "version": "0.5.1",
+  "version": "0.5.3",
   "private": false,
   "description": "ComfyUI bridge plugin for DeepSeek Harness (DSH): browse ComfyUI server workflows and models from the sidebar, and let the session model pick, parametrize, and run workflows on demand — no import step.",
   "type": "module",
@@ -27,7 +27,8 @@
     "LICENSE"
   ],
   "engines": {
-    "node": ">=22"
+    "node": ">=22",
+    "dsh": ">=0.2.2-rc.5"
   },
   "dsh": {
     "bundle": {

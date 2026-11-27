@@ -6,7 +6,7 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 import { createServer } from 'node:http'
 
-import { createApiHandler } from '../lib/http.mjs'
+import { createApiHandler, loopbackAdmission } from '../lib/http.mjs'
 
 function makeActions(overrides = {}) {
   const calls = []
@@ -51,8 +51,8 @@ function makeActions(overrides = {}) {
   return { actions: { ...base, ...overrides }, calls }
 }
 
-async function startServer(actions) {
-  const handler = createApiHandler(actions)
+async function startServer(actions, options) {
+  const handler = createApiHandler(actions, options)
   const server = createServer((req, res) => {
     handler(req, res).catch((error) => {
       res.writeHead(500)
@@ -329,4 +329,81 @@ test('GET /server-workflows/detail 透传 path 并返回详情', async () => {
   } finally {
     await server.close()
   }
+})
+
+/* ── 准入检查 ───────────────────────────────────────────────────────────── */
+
+test('准入检查：admit 返回 403 时请求在处理前被拒，actions 一次都不被调用', async () => {
+  const { actions, calls } = makeActions()
+  const server = await startServer(actions, { admit: () => 403 })
+  try {
+    const { response, json } = await getJson(`${server.url}/api/sendcomfy/state`)
+    assert.equal(response.status, 403)
+    assert.equal(json.ok, false)
+    assert.match(json.error, /准入检查/)
+    assert.equal(calls.length, 0, '被拒请求不得触达 actions')
+  } finally {
+    await server.close()
+  }
+})
+
+test('准入检查：admit 返回 401 时同样被拒（未登录）', async () => {
+  const { actions, calls } = makeActions()
+  const server = await startServer(actions, { admit: () => 401 })
+  try {
+    const { response, json } = await getJson(`${server.url}/api/sendcomfy/state`)
+    assert.equal(response.status, 401)
+    assert.equal(json.ok, false)
+    assert.equal(calls.length, 0)
+  } finally {
+    await server.close()
+  }
+})
+
+test('准入检查：admit 抛错时按 403 处理，不把内部错误抛给调用方', async () => {
+  const { actions } = makeActions()
+  const server = await startServer(actions, { admit: () => { throw new Error('boom') } })
+  try {
+    const { response, json } = await getJson(`${server.url}/api/sendcomfy/state`)
+    assert.equal(response.status, 403)
+    assert.equal(json.ok, false)
+  } finally {
+    await server.close()
+  }
+})
+
+test('准入检查：admit 放行时请求照常处理', async () => {
+  const { actions } = makeActions()
+  let seen = 0
+  const server = await startServer(actions, { admit: () => { seen += 1; return undefined } })
+  try {
+    const { response, json } = await getJson(`${server.url}/api/sendcomfy/state`)
+    assert.equal(response.status, 200)
+    assert.equal(json.ok, true)
+    assert.equal(seen, 1)
+  } finally {
+    await server.close()
+  }
+})
+
+test('loopbackAdmission：只放行回环 Host，挡住 DNS rebinding', () => {
+  const req = (headers) => ({ headers })
+  // 回环 + 无 Origin：放行
+  assert.equal(loopbackAdmission(req({ host: '127.0.0.1:3080' })), undefined)
+  assert.equal(loopbackAdmission(req({ host: 'localhost:3080' })), undefined)
+  assert.equal(loopbackAdmission(req({ host: '[::1]:3080' })), undefined)
+  assert.equal(loopbackAdmission(req({ host: '127.0.0.5:3080' })), undefined)
+  // 外部主机名：拒绝（rebinding）
+  assert.equal(loopbackAdmission(req({ host: 'evil.example.com:3080' })), 403)
+  assert.equal(loopbackAdmission(req({ host: '192.168.1.9:3080' })), 403)
+  assert.equal(loopbackAdmission(req({})), 403)
+})
+
+test('loopbackAdmission：Origin 必须与 Host 同源，跨站与 null 一律拒绝', () => {
+  const req = (headers) => ({ headers })
+  assert.equal(loopbackAdmission(req({ host: '127.0.0.1:3080', origin: 'http://127.0.0.1:3080' })), undefined)
+  assert.equal(loopbackAdmission(req({ host: '127.0.0.1:3080', origin: 'https://evil.example.com' })), 403)
+  assert.equal(loopbackAdmission(req({ host: '127.0.0.1:3080', origin: 'http://127.0.0.1:9999' })), 403)
+  assert.equal(loopbackAdmission(req({ host: '127.0.0.1:3080', origin: 'null' })), 403)
+  assert.equal(loopbackAdmission(req({ host: '127.0.0.1:3080', origin: 'not-a-url' })), 403)
 })

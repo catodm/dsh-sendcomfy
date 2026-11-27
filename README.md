@@ -113,10 +113,22 @@ AI 会自己 `comfy_choose_workflow` → `comfy_workflow` → `comfy_run`，并�
 
 ---
 
+## 访问控制
+
+`/api/sendcomfy/*` 能改配置、触发跑图、上传图片，所以每条请求先过准入检查再分发：
+
+- 有 `connection` 服务时走 `connection.requestRejection({ headers })`：Host/Origin 栅栏（挡 DNS rebinding 与跨站调用）+ 浏览器登录态，与官方插件同一口径；
+- 取不到 `connection` 时退回本机回环栅栏：`Host` 必须回环、`Origin` 必须同源、`Origin: null` 拒绝；
+- 拒绝返回 401/403，请求体不解析、不触达业务层。
+
+`engines.dsh` 声明为 `>=0.2.2-rc.5`（`requestRejection` 从该版本可用）。
+
+---
+
 ## 开发
 
 ```bash
-npm test                     # node:test，160 个用例
+npm test                     # node:test，166 个用例
 ```
 
 纯 ESM、零运行时依赖，只用 Node 内建 + 全局 `fetch`/`FormData`/`Blob`。

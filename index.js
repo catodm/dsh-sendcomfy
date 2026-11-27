@@ -12,7 +12,7 @@ import { readFile, stat } from 'node:fs/promises'
 import { isAbsolute, join, resolve } from 'node:path'
 
 import { createActions, humanizeError } from './lib/actions.mjs'
-import { createApiHandler } from './lib/http.mjs'
+import { createApiHandler, loopbackAdmission } from './lib/http.mjs'
 import { createStateStore } from './lib/state.mjs'
 
 export const name = 'dsh-sendcomfy'
@@ -66,7 +66,48 @@ export function apply(ctx) {
   const actions = createActions({ store, logger })
 
   /* ── 1. 浏览器面板 API ─────────────────────────────────────── */
-  const handler = createApiHandler(actions, { prefix: ROUTE_PREFIX })
+
+  /**
+   * 取 DSH 的 `connection` 服务（浏览器登录态 + Host/Origin 栅栏的持有者）。
+   * 懒取：它可能在本插件激活之后才装好；拿不到就退回本机回环栅栏。
+   */
+  function connectionService() {
+    const usable = (value) => (value && typeof value.requestRejection === 'function' ? value : undefined)
+    try {
+      const direct = usable(ctx.connection)
+      if (direct) return direct
+    } catch {
+      /* 服务未定义 */
+    }
+    try {
+      if (typeof ctx.get === 'function') return usable(ctx.get('connection'))
+    } catch {
+      /* 服务未注册 */
+    }
+    return undefined
+  }
+
+  /**
+   * 准入检查：每条 /api/sendcomfy/* 请求在处理前先过这一关。
+   * 有 `connection` 时用它的 `requestRejection`（Host/Origin 栅栏 + 浏览器登录态，
+   * 与官方插件同一套口径）；没有时退回 `loopbackAdmission`（只放行回环 Host、
+   * 同源 Origin）。宁可误拒也不放行未鉴权调用 —— 这些路由能改配置、触发跑图。
+   */
+  function admit(req) {
+    const connection = connectionService()
+    if (connection) {
+      try {
+        const rejection = connection.requestRejection({ headers: (req && req.headers) || {} })
+        return rejection === 401 || rejection === 403 ? rejection : undefined
+      } catch (error) {
+        logger('准入检查抛错，按拒绝处理：', error?.message || error)
+        return 403
+      }
+    }
+    return loopbackAdmission(req)
+  }
+
+  const handler = createApiHandler(actions, { prefix: ROUTE_PREFIX, admit })
   ctx.effect(
     () => ctx.webServer.register({
       kind: 'prefix',
